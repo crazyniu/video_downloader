@@ -10,7 +10,8 @@ function patchJob(id, patch) {
   const write = jobWrites.then(async () => {
     const key = `job:${id}`;
     const job = (await chrome.storage.session.get(key))[key];
-    await chrome.storage.session.set({[key]: {...job, ...patch}});
+    // A cleared job stays cleared; late progress reports must not bring it back.
+    if (job) await chrome.storage.session.set({[key]: {...job, ...patch}});
   });
   jobWrites = write.catch(console.error);
   return write;
@@ -210,12 +211,14 @@ async function handle(message, sender) {
   }
   if (message.type === 'PAGE_RANGE') return readPageRange(message);
   if (message.type === 'CLEAR_JOBS') {
-    await writes;
+    await jobWrites;
     const stored = await chrome.storage.session.get(null);
-    // Running downloads and jobs still being re-parsed stay; everything finished is removed.
-    const done = ([key, job]) => key.startsWith('job:') && !['queued', 'fetching', 'merging', 'saving'].includes(job.status) && job.refresh !== 'running';
-    await chrome.storage.session.remove(Object.entries(stored).filter(done).map(([key]) => key));
-    return {ok: true};
+    // Only downloads the offscreen document is still working on are kept; stalled ones are cleared too.
+    const [offscreen] = await chrome.runtime.getContexts({contextTypes: ['OFFSCREEN_DOCUMENT']});
+    const live = new Set(offscreen ? (await chrome.runtime.sendMessage({target: 'offscreen', type: 'LIVE_IDS'}))?.ids : []);
+    const removed = Object.keys(stored).filter(key => key.startsWith('job:') && !live.has(key.slice(4)));
+    await chrome.storage.session.remove(removed);
+    return {ok: true, removed: removed.length, kept: live.size};
   }
   if (message.type === 'CANCEL_JOB') {
     const job = (await chrome.storage.session.get(`job:${message.id}`))[`job:${message.id}`];

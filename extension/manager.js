@@ -289,7 +289,7 @@ function jobRow(job) {
 function renderJobs() {
   const active = jobs.filter(job => activeStates.includes(job.status)).length;
   $('active-count').textContent = String(active);
-  $('clear-jobs').hidden = jobs.length === active;
+  $('clear-jobs').hidden = !jobs.length;
   $('complete-count').textContent = String(jobs.filter(job => job.status === 'complete').length);
   $('failed-count').textContent = String(jobs.filter(job => ['error', 'canceled'].includes(job.status)).length);
   if (!jobs.length) {
@@ -306,9 +306,10 @@ function renderJobs() {
 
 $('clear-jobs').addEventListener('click', async () => {
   try {
-    await send({type: 'CLEAR_JOBS'});
+    const result = await send({type: 'CLEAR_JOBS'});
+    if (!result?.ok) throw new Error('插件后台还是旧版本，请在 chrome://extensions 重新加载大懒虫后再试');
     await refresh();
-    toast(jobs.length ? '已清空下载记录，进行中的下载已保留' : '已清空下载记录');
+    toast(result.kept ? `已清空下载记录，保留 ${result.kept} 个进行中的下载` : '已清空下载记录');
   } catch (error) { toast(error.message, true); }
 });
 

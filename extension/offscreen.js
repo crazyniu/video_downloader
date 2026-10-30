@@ -133,6 +133,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     if (index !== -1) { queue.splice(index, 1); void update(message.id, {status: 'canceled'}); }
     controllers.get(message.id)?.abort();
   }
+  if (message.type === 'LIVE_IDS') { respond({ids: [...queue.map(job => job.id), ...controllers.keys()]}); return; }
   if (message.type === 'RELEASE') {
     nativeCompletions.get(message.id)?.();
     if (urls.has(message.id)) { URL.revokeObjectURL(urls.get(message.id)); urls.delete(message.id); }

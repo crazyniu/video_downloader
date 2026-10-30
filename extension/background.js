@@ -178,7 +178,10 @@ chrome.tabs.onRemoved.addListener(tabId => chrome.storage.session.remove(keyFor(
 // Platform addresses expire. When a download fails, resolve the source page again once and queue the same quality.
 async function refreshFailedJob(job) {
   const key = `job:${job.id}`;
-  const mark = async patch => chrome.storage.session.set({[key]: {...(await chrome.storage.session.get(key))[key], ...patch}});
+  const mark = async patch => {
+    const current = (await chrome.storage.session.get(key))[key];
+    if (current) await chrome.storage.session.set({[key]: {...current, ...patch}});
+  };
   await mark({refresh: 'running'});
   try {
     const result = await resolveVideoURL(job.sourceUrl, {quality: job.quality === '原片候选' ? 'original' : 'hd', onProgress: async () => {}, analyze});
