@@ -53,7 +53,7 @@
           <wa-select id="scope" value="all" class="label-hidden" label="网页"><wa-option value="all">所有网页</wa-option><wa-option value="current">当前网页</wa-option></wa-select>
           <span class="toolbar-gap"></span>
           <button id="rescan" class="btn outline" type="button"><wa-icon name="refresh-cw"></wa-icon><span class="label">重新扫描</span></button>
-          <button id="clear" class="btn danger icon" type="button" title="清空列表" aria-label="清空列表"><wa-icon name="trash-2"></wa-icon></button>
+          <button id="clear" class="btn outline danger" type="button" title="清空视频列表"><wa-icon name="trash-2"></wa-icon><span class="label">清空</span></button>
         </div>
 
         <div class="table-head" id="table-head">
@@ -80,6 +80,7 @@
     <section id="downloads-view" class="view" aria-labelledby="downloads-title" hidden>
       <div class="view-head">
         <div><h1 id="downloads-title">下载</h1><p class="muted">文件保存到 Chrome 默认下载目录，关闭此页面不影响下载。</p></div>
+        <button id="clear-jobs" class="btn outline danger" type="button"><wa-icon name="trash-2"></wa-icon>清空记录</button>
       </div>
       <div class="stats">
         <div class="stat"><span class="stat-label"><span class="dot active"></span>进行中</span><strong id="active-count">0</strong></div>

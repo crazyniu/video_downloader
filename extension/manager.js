@@ -289,6 +289,7 @@ function jobRow(job) {
 function renderJobs() {
   const active = jobs.filter(job => activeStates.includes(job.status)).length;
   $('active-count').textContent = String(active);
+  $('clear-jobs').hidden = jobs.length === active;
   $('complete-count').textContent = String(jobs.filter(job => job.status === 'complete').length);
   $('failed-count').textContent = String(jobs.filter(job => ['error', 'canceled'].includes(job.status)).length);
   if (!jobs.length) {
@@ -302,6 +303,14 @@ function renderJobs() {
   }
   $('job-list').replaceChildren(...jobs.toSorted((a, b) => b.createdAt - a.createdAt).map(jobRow));
 }
+
+$('clear-jobs').addEventListener('click', async () => {
+  try {
+    await send({type: 'CLEAR_JOBS'});
+    await refresh();
+    toast(jobs.length ? '已清空下载记录，进行中的下载已保留' : '已清空下载记录');
+  } catch (error) { toast(error.message, true); }
+});
 
 /* ---------- Preview ---------- */
 let previewHls;
@@ -426,9 +435,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (Object.keys(changes).some(key => key.startsWith('media:')) || Object.values(changes).some(change => change.newValue?.status === 'ready')) {
     void refresh().catch(error => toast(error.message, true));
   } else if (Object.keys(changes).some(key => key.startsWith('job:'))) {
-    for (const [key, change] of Object.entries(changes)) if (key.startsWith('job:') && change.newValue) {
-      const index = jobs.findIndex(job => job.id === change.newValue.id);
-      if (index < 0) jobs.push(change.newValue); else jobs[index] = change.newValue;
+    for (const [key, change] of Object.entries(changes)) if (key.startsWith('job:')) {
+      const index = jobs.findIndex(job => `job:${job.id}` === key);
+      if (!change.newValue) { if (index >= 0) jobs.splice(index, 1); }
+      else if (index < 0) jobs.push(change.newValue); else jobs[index] = change.newValue;
     }
     renderJobs();
   }

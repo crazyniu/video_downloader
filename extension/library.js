@@ -209,6 +209,14 @@ async function handle(message, sender) {
     return {downloadId};
   }
   if (message.type === 'PAGE_RANGE') return readPageRange(message);
+  if (message.type === 'CLEAR_JOBS') {
+    await writes;
+    const stored = await chrome.storage.session.get(null);
+    // Running downloads and jobs still being re-parsed stay; everything finished is removed.
+    const done = ([key, job]) => key.startsWith('job:') && !['queued', 'fetching', 'merging', 'saving'].includes(job.status) && job.refresh !== 'running';
+    await chrome.storage.session.remove(Object.entries(stored).filter(done).map(([key]) => key));
+    return {ok: true};
+  }
   if (message.type === 'CANCEL_JOB') {
     const job = (await chrome.storage.session.get(`job:${message.id}`))[`job:${message.id}`];
     if (job.downloadId) await chrome.downloads.cancel(job.downloadId);
@@ -217,7 +225,7 @@ async function handle(message, sender) {
   }
 }
 
-const types = new Set(['CAPTURE_MEDIA', 'LIST_LIBRARY', 'QUEUE_DOWNLOADS', 'CLEAR_LIBRARY', 'JOB_UPDATE', 'SAVE_BLOB', 'PAGE_RANGE', 'CANCEL_JOB', 'START_NATIVE', 'SYNC_NATIVE']);
+const types = new Set(['CAPTURE_MEDIA', 'LIST_LIBRARY', 'QUEUE_DOWNLOADS', 'CLEAR_LIBRARY', 'CLEAR_JOBS', 'JOB_UPDATE', 'SAVE_BLOB', 'PAGE_RANGE', 'CANCEL_JOB', 'START_NATIVE', 'SYNC_NATIVE']);
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (sender.id !== chrome.runtime.id || message.target === 'offscreen' || !types.has(message.type)) return;
   handle(message, sender).then(respond, error => respond({error: error.message}));

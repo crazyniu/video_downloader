@@ -105,9 +105,10 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'session') return;
   if (Object.keys(changes).some(key => key.startsWith('media:'))) { void refresh(); return; }
   let changed = false;
-  for (const [key, change] of Object.entries(changes)) if (key.startsWith('job:') && change.newValue) {
-    const index = jobs.findIndex(job => job.id === change.newValue.id);
-    if (index < 0) jobs.push(change.newValue); else jobs[index] = change.newValue;
+  for (const [key, change] of Object.entries(changes)) if (key.startsWith('job:')) {
+    const index = jobs.findIndex(job => `job:${job.id}` === key);
+    if (!change.newValue) { if (index >= 0) jobs.splice(index, 1); }
+    else if (index < 0) jobs.push(change.newValue); else jobs[index] = change.newValue;
     changed = true;
   }
   if (changed) render();
