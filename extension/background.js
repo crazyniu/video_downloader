@@ -117,12 +117,10 @@ async function analyzePlatform(tab, page) {
   await update(tab.id, {status: 'loading', awemeId: page.id, message: '正在读取当前作品详情…'});
   await chrome.scripting.executeScript({target: {tabId: tab.id}, world: 'MAIN', files: [`${page.platform}.js`]});
   const detail = await inPage(tab.id, async (platform, id) => {
-    try { return await window[platform === 'youtube' ? '__youtubeDownloader' : '__kuaishouDownloader'].getDetail(id); }
+    try { return await window.__kuaishouDownloader.getDetail(id); }
     catch (error) { return {error: error.message}; }
   }, [page.platform, page.id]);
-  const formats = page.platform === 'youtube' ? detail.formats : [detail];
-  const records = await Promise.all(formats.map(format => addMedia({...format, sourceUrl: tab.url, sourceTabId: tab.id})));
-  const preferred = page.platform === 'youtube' ? records[formats.findIndex(item => item.url === detail.preferred.url && item.itag === detail.preferred.itag)] : records[0];
+  const preferred = await addMedia({...detail, sourceUrl: tab.url, sourceTabId: tab.id});
   const current = await chrome.tabs.get(tab.id);
   if (videoPage(current.url)?.id !== page.id) throw new Error('页面已切换，请重新解析当前作品。');
   const result = {...preferred, status: 'ready', awemeId: page.id, fetchedAt: Date.now(), mediaId: preferred.id,

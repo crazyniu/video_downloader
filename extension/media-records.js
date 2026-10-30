@@ -2,18 +2,17 @@ import {videoPage} from './platforms.js';
 
 export function canCaptureSource(value) {
   if (!/^https?:\/\//.test(value)) return false;
-  return !['localhost', '127.0.0.1', '[::1]'].includes(new URL(value).hostname);
+  const host = new URL(value).hostname;
+  // YouTube is not supported: its streams are split and signed, and capturing them only produced broken downloads.
+  return !['localhost', '127.0.0.1', '[::1]'].includes(host) && !/(^|\.)(youtube\.com|youtu\.be)$/.test(host);
 }
 
 export function mediaIdentity(value) {
   const url = new URL(value);
   url.hash = '';
-  if (url.hostname.endsWith('.googlevideo.com') && url.searchParams.has('id') && url.searchParams.has('itag')) {
-    return `youtube:${url.searchParams.get('id')}:${url.searchParams.get('itag')}:${url.searchParams.get('lmt') || ''}`;
-  }
   if (/(^|\.)(douyinvod\.com|idouyinvod\.com|bytecdn\.cn|kwaicdn\.com|kwai\.net|kwimgs\.com|yximgs\.com)$/.test(url.hostname)) {
     const path = url.pathname.includes('/video/tos/') ? url.pathname.slice(url.pathname.indexOf('/video/tos/')) : url.pathname;
-    const format = new URLSearchParams([...url.searchParams].filter(([key]) => ['quality', 'ratio', 'format', 'watermark', 'itag'].includes(key)));
+    const format = new URLSearchParams([...url.searchParams].filter(([key]) => ['quality', 'ratio', 'format', 'watermark'].includes(key)));
     format.sort();
     return `cdn:${path}?${format}`;
   }

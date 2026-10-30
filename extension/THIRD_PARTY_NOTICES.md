@@ -7,17 +7,13 @@ https://github.com/jiji262/douyin-downloader
 
 原片请求参数与浏览器详情解析由本插件实现。上游 MIT 许可见 licenses/douyin-downloader-MIT.txt。该公开仓库只有抖音 CLI；不包含 README 展示的其他平台桌面版完整实现。
 
-## 快手与 YouTube
+## 快手
 
 快手模块参考 JoeanAmier/KS-Downloader，revision b8ecf66d46358c013df1637d46d0194a42d525e3，GPL-3.0。
 https://github.com/JoeanAmier/KS-Downloader
 许可：licenses/KS-Downloader-GPL-3.0.txt。
 
-YouTube 模块参考 yt-dlp 2026.10.26 的 player response 格式解析与实际播放地址处理，Unlicense。
-https://github.com/yt-dlp/yt-dlp/tree/2026.10.26
-许可：licenses/yt-dlp-Unlicense.txt。
-
-模块实现与范围详见 PLATFORM_SOURCES.md。YouTube 仅改写播放器格式解析与已播放签名地址观察，不包含完整 yt-dlp Python 引擎。
+模块实现与范围详见 PLATFORM_SOURCES.md。
 
 ## 浏览器内封装
 

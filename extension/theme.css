@@ -82,7 +82,6 @@ wa-option { font-size: 13px; }
 .thumb { position: relative; display: grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; border-radius: var(--radius-s); background: var(--surface-3); color: var(--ink-3); font-size: 12px; font-weight: 700; }
 .thumb[data-platform="抖音"] { background: #1f1f24; color: #fff; }
 .thumb[data-platform="快手"] { background: #ff6a2b; color: #fff; }
-.thumb[data-platform="YouTube"] { background: #e8352b; color: #fff; }
 
 .muted { color: var(--ink-3); }
 .ellipsis { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

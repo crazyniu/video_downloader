@@ -53,21 +53,15 @@ export async function ensureOffscreen() {
   await creating;
 }
 
-function sourceKey(url) {
-  const parsed = new URL(url);
-  if (platformName(url) === 'YouTube') return parsed.searchParams.get('v') || parsed.pathname;
-  return url;
-}
-
 export async function queueDownloads(items, threads, mode = 'auto') {
   await writes;
   const stored = await chrome.storage.session.get(null);
   const audio = Object.entries(stored).filter(([key, item]) => key.startsWith('media:') && item.kind === 'audio').map(([, item]) => item);
   const jobs = items.map(item => {
-    const track = item.videoOnly ? audio.filter(track => sourceKey(track.sourceUrl) === sourceKey(item.sourceUrl)).sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0) || b.updatedAt - a.updatedAt)[0] : null;
+    const track = item.videoOnly ? audio.filter(track => track.sourceUrl === item.sourceUrl).sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0) || b.updatedAt - a.updatedAt)[0] : null;
     if (item.videoOnly && !track) throw new Error('此视频的音轨尚未识别，请先在作品页播放视频，再重试下载。');
     return {...item, id: crypto.randomUUID(), mediaId: item.id, threads,
-      engine: mode === 'auto' && !track && item.kind === 'video' && /^https?:/.test(item.url) && !new URL(item.url).hostname.endsWith('.googlevideo.com') ? 'browser' : 'parallel',
+      engine: mode === 'auto' && !track && item.kind === 'video' && /^https?:/.test(item.url) ? 'browser' : 'parallel',
       audioUrl: track?.url, createdAt: Date.now(), received: 0, status: 'queued',
       filename: fileName(item.title, item.quality || '视频', item.kind === 'hls' || track ? 'video/mp4' : item.contentType)};
   });
@@ -83,15 +77,13 @@ chrome.webRequest.onResponseStarted.addListener(details => {
   const contentType = header('content-type');
   const kind = mediaType(details.url, contentType);
   if (!kind) return;
-  const url = new URL(details.url);
-  const google = url.hostname.endsWith('.googlevideo.com');
   const size = mediaSize(details.statusCode, header, kind);
   chrome.tabs.get(details.tabId).then(tab => {
     if (!canCaptureSource(tab.url)) return;
     return addMedia({url: details.url, title: tab.title || '网页视频',
       sourceUrl: tab.url, sourceTabId: details.tabId, frameId: details.frameId, contentType, kind,
       size, sizeVerified: size > 0, sizeCheckedAt: size > 0 ? Date.now() : undefined,
-      quality: '网页视频', videoOnly: google && kind === 'video' && !['18', '22', '37', '38', '59', '78'].includes(url.searchParams.get('itag'))});
+      quality: '网页视频'});
   }).catch(error => console.error('记录视频请求失败', error));
 }, {urls: ['http://*/*', 'https://*/*']}, ['responseHeaders']);
 
@@ -132,7 +124,6 @@ async function readLibrary() {
     if (!canCaptureSource(sourceUrl)) {
       if (/^\d+$/.test(record.awemeId || '') && isMediaURL(record.url, 'douyin')) sourceUrl = `https://www.douyin.com/video/${record.awemeId}`;
       else if (record.videoId && isMediaURL(record.url, 'kuaishou')) sourceUrl = `https://www.kuaishou.com/short-video/${record.videoId}`;
-      else if (/^[\w-]{11}$/.test(record.videoId || '') && new URL(record.url).hostname.endsWith('.googlevideo.com')) sourceUrl = `https://www.youtube.com/watch?v=${record.videoId}`;
       else { removed.push(key); continue; }
     }
     const item = {...record, sourceUrl, platform: platformName(sourceUrl)};

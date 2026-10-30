@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "大懒虫",
   "version": "1.5.1",
-  "description": "多平台视频解析与下载：抖音、快手、YouTube 及网页视频，支持批量解析、多线程下载与 HLS。",
+  "description": "抖音、快手及网页视频解析与下载，支持批量解析、多线程下载与 HLS。",
   "minimum_chrome_version": "116",
   "permissions": [
     "activeTab",
@@ -77,17 +77,6 @@
       ],
       "js": [
         "kuaishou.js"
-      ],
-      "run_at": "document_start",
-      "world": "MAIN"
-    },
-    {
-      "matches": [
-        "https://*.youtube.com/*",
-        "https://youtube.com/*"
-      ],
-      "js": [
-        "youtube.js"
       ],
       "run_at": "document_start",
       "world": "MAIN"

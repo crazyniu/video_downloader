@@ -103,7 +103,7 @@ function pumpProbes() {
 export function thumb(item) {
   const node = element('div', undefined, 'thumb');
   node.dataset.platform = item.platform;
-  if (supportedPlatforms.includes(item.platform)) node.textContent = item.platform === 'YouTube' ? 'YT' : item.platform.slice(0, 1);
+  if (supportedPlatforms.includes(item.platform)) node.textContent = item.platform.slice(0, 1);
   else node.append(icon(item.kind === 'hls' ? 'film' : 'video'));
   return node;
 }

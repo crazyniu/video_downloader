@@ -1,4 +1,4 @@
-export const platformNames = {douyin: "抖音", kuaishou: "快手", youtube: "YouTube"};
+export const platformNames = {douyin: "抖音", kuaishou: "快手"};
 
 export function videoPage(url) {
   const parsed = new URL(url);
@@ -13,10 +13,6 @@ export function videoPage(url) {
     platform = "kuaishou";
     id = parsed.searchParams.get("photoId") || parsed.pathname.match(/^\/(?:short-video|fw\/photo)\/([\w-]+)/)?.[1];
     if (!/^[\w-]+$/.test(id || "")) return null;
-  } else if (["www.youtube.com", "youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"].includes(host)) {
-    platform = "youtube";
-    id = host === "youtu.be" ? parsed.pathname.slice(1) : parsed.searchParams.get("v") || parsed.pathname.match(/^\/(?:shorts|embed|live)\/([\w-]+)/)?.[1];
-    if (!/^[\w-]{11}$/.test(id || "")) return null;
   } else return null;
   return {platform, id};
 }

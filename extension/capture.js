@@ -49,27 +49,15 @@
         if (hls) publish(hls.url, document.title, {kind: 'hls'});
       }
     }
-    if (value.streamingData && !window.__youtubeDownloader) {
-      const title = value.videoDetails?.title || document.title;
-      for (const format of [...(value.streamingData.formats || []), ...(value.streamingData.adaptiveFormats || [])]) {
-        if (!format.url) continue; // 带 signatureCipher 的地址由实际播放请求捕获。
-        publish(format.url, title, {contentType: format.mimeType, kind: format.mimeType.startsWith('audio/') ? 'audio' : 'video',
-          quality: format.qualityLabel || '音轨', videoOnly: !format.audioQuality && format.mimeType.startsWith('video/'), itag: String(format.itag)});
-      }
-    }
     Object.values(value).forEach(collect);
   }
   function scan(force = false) {
     if (force) known.clear();
-    window.__youtubeDownloader?.scan(force);
     for (const entry of performance.getEntriesByType('resource')) publishResource(entry);
     for (const video of document.querySelectorAll('video')) {
       publishSource(video.currentSrc || video.src);
       for (const source of video.querySelectorAll('source[src]')) publishSource(source.src, source.type);
     }
-    if (window.ytInitialPlayerResponse) collect(window.ytInitialPlayerResponse);
-    const player = document.querySelector('#movie_player');
-    if (typeof player?.getPlayerResponse === 'function') collect(player.getPlayerResponse());
     for (const id of ['__UNIVERSAL_DATA_FOR_REHYDRATION__', 'SIGI_STATE']) {
       const script = document.getElementById(id);
       if (script) { try { collect(JSON.parse(script.textContent)); } catch {} }
@@ -79,7 +67,7 @@
     clearTimeout(scanTimer);
     scanTimer = setTimeout(() => scan(), 150);
   };
-  const relevant = url => /tiktok\.com\/api\/|\/graphql\/|\/youtubei\/v1\/player/.test(String(url));
+  const relevant = url => /tiktok\.com\/api\/|\/graphql\//.test(String(url));
   const originalFetch = window.fetch;
   window.fetch = async function (...args) {
     const response = await originalFetch.apply(this, args);

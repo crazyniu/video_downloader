@@ -5,7 +5,6 @@ export const platformName = url => {
   if (/(^|\.)douyin\.com$/.test(host)) return '抖音';
   if (/(^|\.)(kuaishou\.com|kuaishou\.cn|chenzhongtech\.com|chenzhongtech\.cn)$/.test(host)) return '快手';
   if (/(^|\.)tiktok\.com$/.test(host)) return 'TikTok';
-  if (/(^|\.)(youtube\.com|youtu\.be)$/.test(host)) return 'YouTube';
   if (/(^|\.)(x\.com|twitter\.com)$/.test(host)) return 'X';
   if (/(^|\.)(telegram\.org|t\.me)$/.test(host)) return 'Telegram';
   return '其他网站';
@@ -14,9 +13,6 @@ export const platformName = url => {
 export function normalizeMediaURL(value) {
   const url = new URL(value);
   url.hash = '';
-  if (url.hostname.endsWith('.googlevideo.com')) {
-    for (const key of ['range', 'rn', 'rbuf']) url.searchParams.delete(key);
-  }
   return url.href;
 }
 
@@ -55,12 +51,9 @@ export function byteRanges(size, chunkSize = 4 * 1024 * 1024) {
 }
 
 export async function fetchVideo(url, {threads, signal, onProgress, pageFetch}) {
-  const google = new URL(url).hostname.endsWith('.googlevideo.com');
   const read = async (start, end) => {
     if (pageFetch) return pageFetch(url, start, end, signal);
-    const target = new URL(url);
-    if (google) target.searchParams.set('range', `${start}-${end}`);
-    return fetch(target.href, {headers: {Range: `bytes=${start}-${end}`}, credentials: 'include', signal});
+    return fetch(url, {headers: {Range: `bytes=${start}-${end}`}, credentials: 'include', signal});
   };
   const probe = await read(0, 0);
   const contentType = probe.headers.get('content-type') || 'video/mp4';
@@ -68,8 +61,8 @@ export async function fetchVideo(url, {threads, signal, onProgress, pageFetch}) 
     await probe.body?.cancel();
     throw new Error('视频地址返回了验证页面，请回到作品页重新识别。');
   }
-  const total = Number(probe.headers.get('content-range')?.match(/\/(\d+)$/)?.[1] || (google ? new URL(url).searchParams.get('clen') : 0));
-  const ranged = probe.status === 206 || (google && total > 0 && Number(probe.headers.get('content-length')) === 1);
+  const total = Number(probe.headers.get('content-range')?.match(/\/(\d+)$/)?.[1] || 0);
+  const ranged = probe.status === 206;
   if (!probe.ok) {
     await probe.body?.cancel();
     throw new Error(`视频地址返回 HTTP ${probe.status}，请回到作品页重新识别。`);
@@ -105,7 +98,7 @@ export async function fetchVideo(url, {threads, signal, onProgress, pageFetch}) 
       const {start, end} = ranges[index];
       const response = await read(start, end);
       const range = response.headers.get('content-range');
-      if ((!google && response.status !== 206) || (range && range !== `bytes ${start}-${end}/${total}`) || !response.ok) {
+      if (response.status !== 206 || (range && range !== `bytes ${start}-${end}/${total}`) || !response.ok) {
         throw new Error('服务器返回的分段范围不一致，已停止合并，请重新识别视频。');
       }
       const part = await readBody(response, total);
