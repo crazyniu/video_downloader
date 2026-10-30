@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN" class="wa-light">
+<head>
+  <meta charset="UTF-8">
+  <title>大懒虫</title>
+  <link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="bar">
+    <div class="brand"><img src="assets/logo.png" alt=""><strong>大懒虫</strong></div>
+    <button id="open-workspace" class="btn sm outline" type="button">打开工作台<wa-icon name="maximize"></wa-icon></button>
+  </header>
+
+  <section id="current" class="current" hidden>
+    <div class="current-text"><strong>当前作品</strong><span id="current-host"></span></div>
+    <div id="current-actions" class="current-actions"></div>
+  </section>
+  <div id="parse-status" class="status" role="status" aria-live="polite" hidden>
+    <wa-icon id="parse-status-icon" name="circle-check"></wa-icon><span id="parse-message"></span>
+  </div>
+
+  <div class="list-head"><span>本页视频</span><span id="page-count" class="counter">0</span></div>
+  <div id="media-list" class="media-list"></div>
+  <div id="empty" class="empty">
+    <wa-icon name="video"></wa-icon>
+    <strong id="empty-title">这个网页还没有视频</strong>
+    <span id="empty-text">播放视频后会自动出现在这里</span>
+  </div>
+
+  <a id="open-downloads" class="foot" href="#" hidden>
+    <span class="dot"></span><span id="jobs-text"></span><wa-icon name="chevron-right"></wa-icon>
+  </a>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

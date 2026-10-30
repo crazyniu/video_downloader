@@ -1,0 +1,92 @@
+# 大懒虫 · 视频下载器
+
+一个 Chrome 扩展（Manifest V3），用来解析和下载网页视频：支持抖音、快手、YouTube，以及其他网页里播放的 MP4 / HLS 视频。
+
+- 不使用第三方解析服务器，所有解析在你自己的浏览器里完成，复用浏览器的登录状态
+- 无需安装 Python、本机服务或命令行工具，加载即可使用
+
+## 功能
+
+**工具栏弹窗**
+
+- 列出当前网页已识别到的视频，显示画质（如「1080P 原片」）和大小，一键复制地址或下载
+- 在抖音 / 快手 / YouTube 作品页可直接「解析当前作品」，抖音可选高清或原片
+- 下载中显示进度，完成后显示勾
+
+**工作台（视频 · 下载 · 设置）**
+
+- 批量解析：每行粘贴一个链接或分享文案，自动识别、依次解析；成功的视频自动勾选，直接「下载所选」
+- 视频列表：按作品分组，同一作品多个画质可切换；支持搜索、平台筛选、预览（含 HLS）、复制地址
+- 下载任务：进度、速度、大小，支持取消和重新下载
+- 链接失效备用方案：平台地址过期导致下载失败时，自动按来源网页重新解析并重新下载；预览失败可一键按来源重新解析
+- 设置：下载方式（自动 / 多线程）与每个文件的线程数
+
+**下载**
+
+- 普通 MP4 交给 Chrome 下载；HLS、YouTube 分轨视频、blob 媒体由扩展下载，分轨用本地打包的 FFmpeg WASM 自动合并音视频
+- 可选分段多线程下载；同时下载 2 个文件
+
+## 安装
+
+1. 下载本仓库（`Code → Download ZIP` 或 `git clone`）
+2. 打开 `chrome://extensions`，开启右上角「开发者模式」
+3. 点击「加载已解压的扩展程序」，选择仓库里的 **`extension`** 文件夹
+
+更新时拉取最新代码，在扩展页点「重新加载」，再刷新已打开的视频网页。
+
+要求 Chrome 116 或更高版本。
+
+## 使用
+
+1. 打开视频网页并播放，点击工具栏的大懒虫图标即可看到本页视频
+2. 在作品页可以点「解析当前作品」拿到平台给出的清晰版本
+3. 需要批量下载时点「打开工作台」，把链接逐行粘贴到输入框
+
+无法解析时：打开来源网页，完成登录或验证并播放视频后再试。
+
+## 权限说明
+
+| 权限 | 用途 |
+| --- | --- |
+| `webRequest`、`<all_urls>` | 识别网页正在加载的视频地址与文件大小 |
+| `scripting`、`activeTab`、`tabs` | 在作品页读取平台详情、重新扫描网页视频、打开来源网页 |
+| `downloads` | 保存文件到 Chrome 下载目录 |
+| `offscreen` | 在后台分段下载与合并音视频 |
+| `storage` | 保存设置与本次会话的视频记录 |
+
+扩展不收集、不上传任何数据。视频记录只保存在本次浏览器会话中。
+
+## 限制
+
+- 抖音「原片」是 `ratio=default` 接口返回的候选地址，未与作者上传的源文件做比对
+- 平台签名、登录、风控或接口变化可能导致解析失败
+- 不支持 DRM 加密内容和直播录制
+- 分轨或 blob 视频下载时请保留来源标签页
+
+## 目录结构
+
+```
+extension/
+├── manifest.json
+├── popup.*           工具栏弹窗
+├── manager.*         工作台
+├── ui.js / theme.css 共用组件与样式
+├── background.js     解析调度、失效重新解析
+├── library.js        视频记录与下载队列
+├── offscreen.js      分段下载、FFmpeg 合并
+├── resolve.js        链接识别与解析
+├── capture.js / bridge.js  网页媒体捕获
+├── page.js / kuaishou.js / youtube.js  平台详情解析
+├── vendor/           本地打包的 Web Awesome、Lucide、hls.js、FFmpeg WASM
+└── licenses/         第三方许可
+```
+
+## 参与贡献
+
+见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 许可
+
+本项目以 [GNU GPL v3](LICENSE) 发布。快手模块改编自 GPL-3.0 项目 [KS-Downloader](https://github.com/JoeanAmier/KS-Downloader)，其余第三方来源与许可见 [extension/THIRD_PARTY_NOTICES.md](extension/THIRD_PARTY_NOTICES.md) 和 [extension/PLATFORM_SOURCES.md](extension/PLATFORM_SOURCES.md)。
+
+请仅下载你有权保存的内容，并遵守各平台的服务条款与当地法律。

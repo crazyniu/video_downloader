@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="zh-CN" class="wa-light">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>大懒虫</title>
+  <link rel="icon" type="image/png" href="assets/icon-32.png">
+  <link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="manager.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#videos"><img src="assets/logo.png" alt=""><strong>大懒虫</strong></a>
+      <nav class="tabs" aria-label="工作台导航">
+        <a class="tab" data-page="videos" href="#videos">视频</a>
+        <a class="tab" data-page="downloads" href="#downloads">下载</a>
+        <a class="tab" data-page="settings" href="#settings">设置</a>
+      </nav>
+      <button id="help" class="btn icon" type="button" title="使用帮助" aria-label="使用帮助"><wa-icon name="circle-help"></wa-icon></button>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- 视频 -->
+    <section id="videos-view" class="view" aria-labelledby="videos-title">
+      <div class="view-head">
+        <div><h1 id="videos-title">视频</h1><p class="muted">粘贴链接解析，或在网页播放视频后自动收录。</p></div>
+      </div>
+
+      <form id="parse-form" class="parse card">
+        <label for="video-url" class="sr-only">视频链接，每行一个</label>
+        <textarea id="video-url" class="parse-text" rows="3" placeholder="粘贴视频链接或分享文案，每行一个，支持一次粘贴多个&#10;支持抖音、快手、YouTube 及其他网页视频" autocomplete="off" spellcheck="false"></textarea>
+        <div class="parse-foot">
+          <span id="link-count" class="muted">粘贴后自动识别</span>
+          <wa-select id="parse-quality" value="hd" size="s" class="parse-quality label-hidden" label="抖音画质" title="仅对抖音链接生效">
+            <wa-option value="hd">抖音 · 高清</wa-option>
+            <wa-option value="original">抖音 · 原片候选</wa-option>
+          </wa-select>
+          <button id="parse" class="btn primary" type="submit">解析</button>
+        </div>
+        <div id="parse-results" class="parse-results" hidden>
+          <div class="results-head">
+            <span id="results-summary"></span>
+            <button id="results-clear" class="btn sm" type="button">清除</button>
+          </div>
+          <ul id="results-list" class="results-list" role="status" aria-live="polite"></ul>
+        </div>
+      </form>
+
+      <section class="library card" aria-label="视频列表">
+        <div class="toolbar">
+          <wa-input id="search" value="" class="toolbar-search label-hidden" label="搜索视频" placeholder="搜索标题或来源" with-clear><wa-icon name="search" slot="start"></wa-icon></wa-input>
+          <wa-select id="platform" value="all" class="label-hidden" label="平台"><wa-option value="all">全部平台</wa-option><wa-option value="other">其他网页</wa-option></wa-select>
+          <wa-select id="scope" value="all" class="label-hidden" label="网页"><wa-option value="all">所有网页</wa-option><wa-option value="current">当前网页</wa-option></wa-select>
+          <span class="toolbar-gap"></span>
+          <button id="rescan" class="btn outline" type="button"><wa-icon name="refresh-cw"></wa-icon><span class="label">重新扫描</span></button>
+          <button id="clear" class="btn danger icon" type="button" title="清空列表" aria-label="清空列表"><wa-icon name="trash-2"></wa-icon></button>
+        </div>
+
+        <div class="table-head" id="table-head">
+          <wa-checkbox id="select-all"><span class="sr-only">全选</span></wa-checkbox>
+          <span>视频</span><span>画质</span><span class="col-size">大小</span><span class="col-actions"><span id="visible-count">0 个</span></span>
+        </div>
+        <div id="media-list" class="media-list"></div>
+
+        <div id="empty" class="empty">
+          <div class="empty-art"><wa-icon name="video"></wa-icon></div>
+          <h3>还没有视频</h3>
+          <p>在上方粘贴链接，或打开视频网页并播放</p>
+        </div>
+      </section>
+
+      <div id="batch-bar" class="batch-bar" hidden>
+        <span id="batch-summary">已选 0 个</span>
+        <button id="batch-clear" class="btn sm" type="button">取消选择</button>
+        <button id="batch-download" class="btn primary" type="button"><wa-icon name="download"></wa-icon>下载所选</button>
+      </div>
+    </section>
+
+    <!-- 下载 -->
+    <section id="downloads-view" class="view" aria-labelledby="downloads-title" hidden>
+      <div class="view-head">
+        <div><h1 id="downloads-title">下载</h1><p class="muted">文件保存到 Chrome 默认下载目录，关闭此页面不影响下载。</p></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="stat-label"><span class="dot active"></span>进行中</span><strong id="active-count">0</strong></div>
+        <div class="stat"><span class="stat-label"><span class="dot done"></span>已完成</span><strong id="complete-count">0</strong></div>
+        <div class="stat"><span class="stat-label"><span class="dot failed"></span>失败 / 取消</span><strong id="failed-count">0</strong></div>
+      </div>
+      <section class="card" aria-label="下载任务">
+        <div id="job-list" class="job-list"></div>
+      </section>
+    </section>
+
+    <!-- 设置 -->
+    <section id="settings-view" class="view settings" aria-labelledby="settings-title" hidden>
+      <div class="view-head">
+        <div><h1 id="settings-title">设置</h1><p class="muted">更改会自动保存。</p></div>
+      </div>
+
+      <section class="card settings-group" aria-labelledby="dl-heading">
+        <h2 id="dl-heading" class="group-title">下载</h2>
+        <div class="setting">
+          <div class="setting-text"><label for="download-mode">下载方式</label><p id="mode-hint" class="muted">普通视频由 Chrome 直接下载；HLS、分轨视频自动使用扩展下载器。</p></div>
+          <wa-select id="download-mode" value="auto" class="label-hidden" label="下载方式"><wa-option value="auto">自动（推荐）</wa-option><wa-option value="parallel">多线程下载</wa-option></wa-select>
+        </div>
+        <div class="setting">
+          <div class="setting-text"><label for="threads">每个文件的线程数</label><p class="muted">同时下载 2 个文件，多线程模式下每个文件按此分段。</p></div>
+          <wa-select id="threads" value="8" class="label-hidden" label="线程数"><wa-option value="1">1 线程</wa-option><wa-option value="2">2 线程</wa-option><wa-option value="4">4 线程</wa-option><wa-option value="8">8 线程</wa-option></wa-select>
+        </div>
+      </section>
+
+
+      <p class="version muted" id="version"></p>
+    </section>
+  </main>
+
+  <wa-dialog id="help-dialog" label="使用帮助" light-dismiss>
+    <dl class="help">
+      <dt>解析</dt><dd>每行一个作品网址、分享文案或媒体直链，粘贴后自动解析，⌘/Ctrl + Enter 立即解析。解析成功的视频会自动勾选，可直接「下载所选」。</dd>
+      <dt>下载</dt><dd>「自动」方式下普通视频交给 Chrome 保存；HLS、分轨视频使用扩展下载器，下载时请保留来源标签页。</dd>
+      <dt>无法解析</dt><dd>打开来源网页完成登录或验证，播放视频后重试。抖音原片候选不等于作者上传的源文件。</dd>
+      <dt>链接失效</dt><dd>平台地址会过期。下载失败时会自动按来源网页重新解析并重新下载；预览失败可点「按来源重新解析」。</dd>
+      <dt>记录</dt><dd>视频记录保留到浏览器关闭为止，清空列表不影响正在进行的下载。</dd>
+    </dl>
+  </wa-dialog>
+
+  <wa-dialog id="video-preview" label="视频预览" class="preview-dialog">
+    <div class="player">
+      <video id="preview-video" playsinline preload="metadata" aria-label="预览视频"></video>
+      <div id="preview-loading" class="player-loading" hidden><wa-spinner></wa-spinner></div>
+    </div>
+    <div class="player-bar">
+      <button id="preview-play" class="btn icon" type="button" title="播放" aria-label="播放"><wa-icon name="play"></wa-icon></button>
+      <span id="preview-time" class="player-time">0:00 / 0:00</span>
+      <wa-slider id="preview-seek" class="label-hidden" label="播放进度" min="0" max="100" step="0.1" value="0" disabled></wa-slider>
+      <button id="preview-mute" class="btn icon" type="button" title="静音" aria-label="静音"><wa-icon name="volume-2"></wa-icon></button>
+    </div>
+    <div id="preview-problem" class="player-notice" role="status" hidden><span id="preview-notice"></span><button id="preview-refresh" class="btn sm outline" type="button" hidden><wa-icon name="refresh-cw"></wa-icon>按来源重新解析</button></div>
+    <a id="preview-source" slot="footer" class="btn outline" target="_blank" rel="noreferrer">打开来源<wa-icon name="external-link"></wa-icon></a>
+  </wa-dialog>
+
+  <script type="module" src="manager.js"></script>
+</body>
+</html>
