@@ -41,7 +41,7 @@
 GitHub Actions 的「Pack CRX」工作流会把 `extension/` 打包成签名的 `.crx` 和同内容的 `.zip`：
 
 - 推送到 `main`（改动了扩展）或在 Actions 页手动运行：在该次运行的 Artifacts 里下载
-- 推送 `v1.5.1` 这样的标签（须与 `manifest.json` 的版本一致）：同时发布到 Releases
+- 推送 `v1.5.1` 这样的标签（须与 `manifest.json` 的版本一致）：同时发布到 Releases。版本号和打标签由 AI 助手按 `AGENTS.md`「发版」一节处理
 
 签名私钥放在仓库 Secret `CRX_PRIVATE_KEY`，扩展 ID 由它决定，请固定使用同一把并妥善备份。没有设置时每次构建用临时私钥，ID 会变。生成私钥：
 

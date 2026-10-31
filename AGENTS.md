@@ -16,7 +16,18 @@
 
 检查语法：`for f in extension/*.js; do node --check "$f"; done`
 
-打包：`scripts/pack.sh [key.pem]` 用 Chrome 的 `--pack-extension` 生成 `dist/` 下的 `.crx` 与 `.zip`；`.github/workflows/pack.yml` 在推送 `main` 和 `v*` 标签时运行，签名私钥取自 Secret `CRX_PRIVATE_KEY`。私钥不要提交（`.gitignore` 已忽略 `*.pem`）。
+打包：`scripts/pack.sh [key.pem]` 用 Chrome 的 `--pack-extension` 生成 `dist/` 下的 `.crx` 与 `.zip`；`.github/workflows/pack.yml` 在推送 `main` 和 `v*` 标签时运行，签名私钥取自 Secret `CRX_PRIVATE_KEY`（已设置，扩展 ID `ndfjcobjjekmbohcnljkponkkeloamfm`）。私钥不要提交（`.gitignore` 已忽略 `*.pem`），本机备份在 `~/.config/dalanchong/dalanchong-crx.pem`。
+
+## 发版
+
+版本号和发版由 AI 负责，维护者不手动改版本号。用户说「发版」「打包」「发布新版本」时：
+
+1. 从上一个 `v*` 标签起看 `git log`，按改动定版本号（`manifest.json` 的 `version`）：只修问题加修订号（1.5.1 → 1.5.2），新增或改变功能加次版本号（1.5.1 → 1.6.0），主版本号只在用户要求时改
+2. 只改 `extension/manifest.json` 的 `version`，提交 `Release v<版本>`
+3. 打同名标签并推送：`git push origin main && git tag v<版本> && git push origin v<版本>`；工作流会检查标签与 manifest 一致，打包并发布到 Releases
+4. 用 `gh run watch` 等工作流结束，确认 Release 里有 `.crx` 和 `.zip`、运行摘要里的扩展 ID 没变，再把 Release 链接告诉用户
+
+不要重复使用或移动已推送的标签；发错了就发下一个修订号。
 
 ## 结构
 
