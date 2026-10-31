@@ -3,33 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <title>大懒虫</title>
-  <link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="theme.css"><link rel="stylesheet" href="player.css"><link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <header class="bar">
     <div class="brand"><img src="assets/logo.png" alt=""><strong>大懒虫</strong></div>
-    <button id="open-workspace" class="btn sm outline" type="button">打开工作台<wa-icon name="maximize"></wa-icon></button>
+    <button id="open-workspace" class="btn sm outline" type="button">批量下载<wa-icon name="maximize"></wa-icon></button>
   </header>
 
-  <section id="current" class="current" hidden>
-    <div class="current-text"><strong>当前作品</strong><span id="current-host"></span></div>
-    <div id="current-actions" class="current-actions"></div>
-  </section>
-  <div id="parse-status" class="status" role="status" aria-live="polite" hidden>
-    <wa-icon id="parse-status-icon" name="circle-check"></wa-icon><span id="parse-message"></span>
-  </div>
+  <div id="auto-status" class="auto-status" role="status" aria-live="polite" hidden><wa-spinner></wa-spinner><span id="auto-text"></span></div>
 
-  <div class="list-head"><span>本页视频</span><span id="page-count" class="counter">0</span></div>
+  <div class="list-head">
+    <wa-checkbox id="select-all"><span class="sr-only">全选</span></wa-checkbox>
+    <span>已监听视频</span><span id="page-count" class="counter">0</span>
+    <span class="list-gap"></span>
+    <button id="clear" class="btn sm danger" type="button" title="清空已监听的视频" hidden><wa-icon name="trash-2"></wa-icon>清空</button>
+  </div>
   <div id="media-list" class="media-list"></div>
   <div id="empty" class="empty">
     <wa-icon name="video"></wa-icon>
-    <strong id="empty-title">这个网页还没有视频</strong>
-    <span id="empty-text">播放视频后会自动出现在这里</span>
+    <strong>还没有监听到视频</strong>
+    <span>在网页中播放视频后会自动出现在这里</span>
   </div>
 
-  <a id="open-downloads" class="foot" href="#" hidden>
-    <span class="dot"></span><span id="jobs-text"></span><wa-icon name="chevron-right"></wa-icon>
-  </a>
+  <footer id="batch" class="batch" hidden>
+    <span id="batch-summary"></span>
+    <button id="batch-download" class="btn sm primary" type="button"><wa-icon name="download"></wa-icon><span id="batch-label">全部下载</span></button>
+  </footer>
 
   <script type="module" src="popup.js"></script>
 </body>

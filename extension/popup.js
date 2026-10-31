@@ -1,98 +1,128 @@
 import './vendor/ui/components.js';
-import {platformNames, videoPage} from './platforms.js';
-import {$, activeStates, copyText, createParser, element, groupedItems, icon, iconButton, jobFraction, loadResolutions, formatText, probeResolutions, qualitySelect, queue, send, textButton, thumb, toast} from './ui.js';
+import {videoGroups} from './media-records.js';
+import {videoPage} from './platforms.js';
+import {createPlayer} from './player.js';
+import {$, activeStates, copyText, downloadState, element, iconButton, loadResolutions, formatText, probeResolutions, queue, send, sizeText, thumb, toast} from './ui.js';
 
-const chosenFormats = new Map();
-let items = [], jobs = [];
-const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
-const tabURL = /^https?:/.test(tab?.url || '') ? tab.url : '';
-const page = tabURL ? videoPage(tabURL) : null;
+// One row per work, selected by group key.
+const selected = new Set();
+let items = [], jobs = [], visible = [];
 
-function openWorkspace(hash) {
-  void chrome.tabs.create({url: chrome.runtime.getURL(`manager.html${tab ? `?tabId=${tab.id}` : ''}${hash}`)});
+// No quality picker: each work downloads its largest file. On Douyin the largest file is the original upload (原画).
+function bestFormats() {
+  return videoGroups(items).map(group => {
+    const best = group.formats.reduce((a, b) => (b.size || 0) > (a.size || 0) ? b : a);
+    return {...best, groupKey: group.key, formats: group.formats};
+  });
+}
+// The popup is small: the preview fills its width, and fullscreen is not available in extension popups.
+const player = createPlayer({fullscreen: false, bounds: () => ({maxWidth: innerWidth - 16, maxHeight: 420, minWidth: innerWidth - 16})});
+const formatLabel = item => item.platform === '抖音' && item.formats.length > 1 ? `原画 · ${sizeText(item.size)}` : formatText(item);
+
+$('open-workspace').addEventListener('click', () => {
+  void chrome.tabs.create({url: chrome.runtime.getURL('manager.html#videos')});
   window.close();
-}
-$('open-workspace').addEventListener('click', () => openWorkspace('#videos'));
-$('open-downloads').addEventListener('click', event => { event.preventDefault(); openWorkspace('#downloads'); });
-
-function downloadState(item) {
-  const job = jobs.filter(job => item.formats.some(format => format.id === job.mediaId)).sort((a, b) => b.createdAt - a.createdAt)[0];
-  if (job && activeStates.includes(job.status)) {
-    const fraction = jobFraction(job);
-    const node = element('div', undefined, 'item-progress');
-    const ring = element('div', undefined, fraction ? 'ring' : 'ring indeterminate');
-    ring.style.setProperty('--p', String(Math.round(fraction * 100)));
-    node.title = fraction ? `下载中 ${Math.round(fraction * 100)}%` : '下载中';
-    node.append(ring);
-    return node;
-  }
-  if (job?.status === 'complete' && job.mediaId === item.id) {
-    const node = element('div', undefined, 'item-done');
-    node.title = '已下载';
-    node.append(icon('circle-check'));
-    return node;
-  }
-  const download = iconButton('download', '下载', 'btn primary dl');
-  download.onclick = async () => {
-    download.disabled = true;
-    try { await queue([item.id]); }
-    catch (error) { toast(error.message, true); download.disabled = false; }
-  };
-  return download;
-}
+});
 
 function itemRow(item) {
   const row = element('article', undefined, 'item');
+  row.dataset.selected = String(selected.has(item.groupKey));
+  const checkbox = element('wa-checkbox');
+  checkbox.checked = selected.has(item.groupKey);
+  checkbox.append(element('span', `选择 ${item.title}`, 'sr-only'));
+  checkbox.addEventListener('change', () => {
+    if (checkbox.checked) selected.add(item.groupKey); else selected.delete(item.groupKey);
+    row.dataset.selected = String(checkbox.checked);
+    renderSelection();
+  });
   const text = element('div', undefined, 'item-text');
   const title = element('div', item.title || '网页视频', 'item-title');
   title.title = item.title || '';
   const meta = element('div', undefined, 'item-meta');
-  if (item.formats.length > 1) meta.append(qualitySelect(item, id => { chosenFormats.set(item.groupKey, id); render(); }));
-  else meta.append(formatText(item));
+  meta.append(formatLabel(item));
   text.append(title, meta);
   const actions = element('div', undefined, 'item-actions');
+  const preview = iconButton('eye', '预览', 'btn sm icon');
+  preview.onclick = () => player.open(item);
   const copy = iconButton('copy', '复制视频地址', 'btn sm icon');
   copy.onclick = () => void copyText(item.url);
-  actions.append(copy, downloadState(item));
-  row.append(thumb(item), text, actions);
+  actions.append(preview, copy, downloadState(item, jobs, () => queue([item.id])));
+  row.append(checkbox, thumb(item), text, actions);
   return row;
 }
 
+function renderSelection() {
+  const checked = visible.filter(item => selected.has(item.groupKey)).length;
+  $('select-all').checked = visible.length > 0 && checked === visible.length;
+  $('select-all').indeterminate = checked > 0 && checked < visible.length;
+  $('select-all').disabled = visible.length === 0;
+  const active = jobs.filter(job => activeStates.includes(job.status)).length;
+  $('batch').hidden = visible.length === 0 && !active;
+  $('batch-download').hidden = visible.length === 0;
+  $('batch-label').textContent = checked ? `下载所选（${checked}）` : `全部下载（${visible.length}）`;
+  $('batch-summary').textContent = active ? `${active} 个视频下载中` : checked ? `已选 ${checked} 个` : '';
+}
+
 function render() {
-  const visible = groupedItems(items.filter(item => item.sourceTabId === tab?.id), chosenFormats);
-  probeResolutions(visible.flatMap(item => item.formats), render);
+  visible = bestFormats();
+  for (const key of selected) if (!visible.some(item => item.groupKey === key)) selected.delete(key);
+  probeResolutions(visible, render);
   $('page-count').textContent = String(visible.length);
+  $('clear').hidden = visible.length === 0;
   $('media-list').replaceChildren(...visible.map(itemRow));
   $('empty').hidden = visible.length > 0;
-  $('empty-title').textContent = tabURL ? '这个网页还没有视频' : '此页面无法识别视频';
-  $('empty-text').textContent = !tabURL ? '在普通网页中打开插件' : page ? '点击上方解析当前作品，或播放视频' : '播放视频后会自动出现在这里';
-
-  const active = jobs.filter(job => activeStates.includes(job.status)).length;
-  $('open-downloads').hidden = !jobs.length;
-  $('open-downloads').classList.toggle('busy', active > 0);
-  $('jobs-text').textContent = active ? `${active} 个视频下载中` : `查看下载任务（${jobs.length}）`;
+  renderSelection();
 }
 
-/* ---------- Current work on platform pages ---------- */
-const parser = createParser({
-  onState(state) {
-    $('parse-status').hidden = false;
-    $('parse-status').dataset.status = state.status;
-    $('parse-message').textContent = state.message;
-    $('parse-status-icon').name = state.status === 'loading' ? 'refresh-cw' : state.status === 'error' ? 'circle-alert' : 'circle-check';
-    $('current-actions').querySelectorAll('button').forEach(button => { button.disabled = state.status === 'loading'; });
-  }
+$('select-all').addEventListener('change', () => {
+  for (const item of visible) { if ($('select-all').checked) selected.add(item.groupKey); else selected.delete(item.groupKey); }
+  render();
 });
-if (page) {
-  $('current').hidden = false;
-  $('current-host').textContent = `${platformNames[page.platform]} · ${page.id}`;
-  const actions = page.platform === 'douyin' ? [['解析高清', 'hd', 'btn sm outline'], ['解析原片', 'original', 'btn sm primary']] : [['解析', 'hd', 'btn sm primary']];
-  for (const [label, quality, className] of actions) {
-    const button = textButton(label, undefined, className);
-    button.onclick = () => void parser.parse(tabURL, quality);
-    $('current-actions').append(button);
-  }
+$('batch-download').addEventListener('click', async () => {
+  const chosen = visible.filter(item => selected.has(item.groupKey));
+  const targets = chosen.length ? chosen : visible;
+  if (!targets.length) return;
+  $('batch-download').disabled = true;
+  try {
+    const {jobIds} = await queue(targets.map(item => item.id));
+    selected.clear();
+    toast(`已添加 ${jobIds.length} 个下载任务`);
+    render();
+  } catch (error) { toast(error.message, true); }
+  finally { $('batch-download').disabled = false; }
+});
+$('clear').addEventListener('click', async () => {
+  try {
+    await send({type: 'CLEAR_LIBRARY'});
+    selected.clear();
+    await refresh();
+    toast('已清空，进行中的下载不受影响');
+  } catch (error) { toast(error.message, true); }
+});
+
+/* ---------- Auto-parse the work open in the current tab ---------- */
+// The page's own player often only streams a compressed copy, so the work page is parsed once for its original file.
+const [tab] = await chrome.tabs.query({active: true, currentWindow: true});
+const page = /^https?:/.test(tab?.url || '') ? videoPage(tab.url) : null;
+function showAutoStatus(state) {
+  $('auto-status').hidden = !state || state.status === 'ready';
+  if (!state) return;
+  $('auto-status').dataset.status = state.status;
+  $('auto-text').textContent = state.status === 'error' ? `当前作品解析失败：${state.message}` : state.message || '正在解析当前作品…';
 }
+async function autoParse() {
+  if (!page) return;
+  const parsed = items.some(item => item.quality !== '网页视频' && videoPage(item.sourceUrl)?.id === page.id);
+  const key = `video:${tab.id}`;
+  const current = (await chrome.storage.session.get(key))[key];
+  if (parsed || (current?.status === 'loading' && current.awemeId === page.id)) return;
+  showAutoStatus({status: 'loading'});
+  await send({type: 'ANALYZE', tabId: tab.id, quality: 'original'}).catch(error => showAutoStatus({status: 'error', message: error.message}));
+}
+chrome.storage.onChanged.addListener((changes, area) => {
+  const change = area === 'session' && page && changes[`video:${tab.id}`];
+  if (change?.newValue) showAutoStatus(change.newValue);
+});
 
 /* ---------- Data ---------- */
 async function refresh() {
@@ -115,3 +145,4 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 await loadResolutions();
 await refresh().catch(error => toast(error.message, true));
+void autoParse();

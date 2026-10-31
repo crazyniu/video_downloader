@@ -22,15 +22,16 @@
 | --- | --- |
 | `manifest.json` | 权限、内容脚本、`popup.html` 弹窗、`manager.html` 工作台 |
 | `background.js` | Service Worker 入口：`PARSE_URL` 解析、抖音详情、`REFRESH_JOB` 链接失效后按来源重新解析 |
-| `library.js` | 视频记录与下载队列：`LIST_LIBRARY`、`QUEUE_DOWNLOADS`、`CANCEL_JOB`、`CLEAR_LIBRARY`，webRequest 捕获 |
+| `library.js` | 视频记录与下载队列：`LIST_LIBRARY`、`QUEUE_DOWNLOADS`、`CANCEL_JOB`、`CLEAR_LIBRARY`，webRequest 捕获，工具栏图标数字（已监听视频数） |
 | `resolve.js` / `platforms.js` | 从链接或分享文案识别平台与作品 ID |
 | `media.js` / `media-records.js` | 媒体类型、分段下载、去重标识、来源校验 |
 | `offscreen.js` | 后台文档：多线程分段下载、HLS、FFmpeg WASM 合并音视频 |
 | `capture.js` / `bridge.js` | 网页 MAIN world 媒体捕获，经 bridge 发给后台 |
 | `page.js` / `kuaishou.js` | 在作品页 MAIN world 读取抖音 / 快手详情 |
 | `ui.js` / `theme.css` | 弹窗与工作台共用的组件、画质文字、样式变量 |
-| `popup.*` | 工具栏弹窗：当前作品解析、本页视频 |
-| `manager.*` | 工作台：视频（批量解析 + 列表）、下载、设置 |
+| `popup.*` | 工具栏弹窗：累计监听到的视频（每个作品取最大文件）、预览、多选 / 全部下载、清空；打开作品页时自动解析当前作品 |
+| `manager.*` | 工作台：批量下载（只列出本页解析的抖音作品，行内显示下载进度）、设置 |
+| `player.*` | 弹窗与工作台共用的视频预览弹框 |
 | `vendor/` | 本地打包的 Web Awesome、Lucide 图标、hls.js、FFmpeg WASM，不要手改 |
 
 数据都在 `chrome.storage.session`：`media:<id>` 视频记录、`job:<id>` 下载任务、`parse:<requestId>` 解析进度、`res:<id>` 读取到的分辨率。设置在 `chrome.storage.local`（`downloadMode`、`downloadThreads`）。
@@ -48,7 +49,7 @@
 ## 改动前后检查
 
 - 改解析或下载逻辑时，在真实的抖音、快手作品页和一个普通网页视频上实测，并在 PR 说明测过哪些链接
-- 确认弹窗、工作台三个页面在窄窗口和宽窗口下排版正常，控制台无报错
+- 确认弹窗、工作台两个页面在窄窗口和宽窗口下排版正常，控制台无报错
 
 ## 许可
 

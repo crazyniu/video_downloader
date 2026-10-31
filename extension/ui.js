@@ -130,6 +130,34 @@ export function qualitySelect(item, onChange, className = 'quality-select') {
   return select;
 }
 
+// Latest download job of a row: a progress ring while running, a check once done, otherwise a download button.
+export function downloadState(item, jobs, onDownload) {
+  const job = jobs.filter(job => item.formats.some(format => format.id === job.mediaId)).sort((a, b) => b.createdAt - a.createdAt)[0];
+  if (job && activeStates.includes(job.status)) {
+    const fraction = jobFraction(job);
+    const node = element('div', undefined, 'item-progress');
+    const ring = element('div', undefined, fraction ? 'ring' : 'ring indeterminate');
+    ring.style.setProperty('--p', String(Math.round(fraction * 100)));
+    node.title = fraction ? `${jobStates[job.status]} ${Math.round(fraction * 100)}%` : jobStates[job.status];
+    node.append(ring);
+    return node;
+  }
+  if (job?.status === 'complete' && job.mediaId === item.id) {
+    const node = element('div', undefined, 'item-done');
+    node.title = '已下载';
+    node.append(icon('circle-check'));
+    return node;
+  }
+  const download = iconButton('download', '下载', 'btn primary dl');
+  if (job && ['error', 'canceled'].includes(job.status)) download.title = `${jobStates[job.status]}${job.error ? `：${job.error}` : ''}，点击重新下载`;
+  download.onclick = async () => {
+    download.disabled = true;
+    try { await onDownload(); }
+    catch (error) { toast(error.message, true); download.disabled = false; }
+  };
+  return download;
+}
+
 export async function queue(ids) {
   const {downloadThreads = '8', downloadMode = 'auto'} = await chrome.storage.local.get(['downloadThreads', 'downloadMode']);
   return send({type: 'QUEUE_DOWNLOADS', ids, threads: Number(downloadThreads), mode: downloadMode});

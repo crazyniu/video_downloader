@@ -1,24 +1,24 @@
 import './vendor/ui/components.js';
-import Hls from './vendor/ui/hls.js';
+import {createPlayer} from './player.js';
 import {videoGroups} from './media-records.js';
-import {$, activeStates, copyText, element, groupedItems, icon, iconButton, jobFraction, jobStates, loadResolutions, probeResolutions, qualitySelect, qualityText, send, sizeText, speedText, supportedPlatforms, textButton, thumb, toast} from './ui.js';
+import {$, activeStates, copyText, downloadState, element, groupedItems, icon, iconButton, loadResolutions, probeResolutions, qualitySelect, qualityText, send, sizeText, supportedPlatforms, thumb, toast} from './ui.js';
 
 const selected = new Set();
 const chosenFormats = new Map();
 let items = [], jobs = [], inputTimer;
 const pageURL = new URL(location.href);
-const sourceTabId = Number(pageURL.searchParams.get('tabId')) || 0;
+// This page only lists works parsed here; videos captured on other pages are shown in the popup.
+const parsedKeys = new Set(JSON.parse(sessionStorage.getItem('parsedKeys') || '[]'));
+const saveParsed = () => sessionStorage.setItem('parsedKeys', JSON.stringify([...parsedKeys]));
+const isDouyinLink = line => /https?:\/\/[^\s]*(douyin\.com|iesdouyin\.com)/i.test(line);
 $('version').textContent = `大懒虫 ${chrome.runtime.getManifest().version}`;
 
 /* ---------- Videos ---------- */
 function visibleItems() {
   const query = $('search').value.trim().toLowerCase();
-  const platform = $('platform').value;
-  return groupedItems(items, chosenFormats).filter(item =>
-    ($('scope').value !== 'current' || item.sourceTabId === sourceTabId) &&
-    (platform === 'all' || (platform === 'other' ? !supportedPlatforms.includes(item.platform) : item.platform === platform)) &&
-    `${item.title} ${item.sourceUrl}`.toLowerCase().includes(query));
+  return parsedItems().filter(item => `${item.title} ${item.author || ''} ${item.sourceUrl}`.toLowerCase().includes(query));
 }
+const parsedItems = () => groupedItems(items, chosenFormats).filter(item => parsedKeys.has(item.groupKey));
 
 function renderSelection() {
   const visible = visibleItems();
@@ -72,11 +72,7 @@ function mediaRow(item) {
   preview.onclick = () => openPreview(item);
   const copy = iconButton('copy', '复制视频地址');
   copy.onclick = () => void copyText(item.url);
-  const download = textButton('', 'download', 'btn soft sm');
-  download.append(element('span', '下载', 'label'));
-  download.setAttribute('aria-label', '下载');
-  download.onclick = () => void start([item.id]);
-  actions.append(preview, copy, download);
+  actions.append(preview, copy, downloadState(item, jobs, () => start([item.id])));
 
   row.append(checkbox, main, quality, size, actions);
   return row;
@@ -84,22 +80,25 @@ function mediaRow(item) {
 
 function renderMedia() {
   const visible = visibleItems();
-  const total = videoGroups(items).length;
+  const parsed = parsedItems();
+  const total = parsed.length;
   probeResolutions(visible.flatMap(item => item.formats), renderMedia);
   $('visible-count').textContent = `${visible.length} 个`;
   $('table-head').hidden = visible.length === 0;
   $('empty').hidden = visible.length > 0;
   $('empty').querySelector('h3').textContent = total ? '没有匹配的视频' : '还没有视频';
-  $('empty').querySelector('p').textContent = total ? '换个关键词，或调整平台和网页筛选' : '在上方粘贴链接，或打开视频网页并播放';
+  $('empty').querySelector('p').textContent = total ? '换个关键词试试' : '在上方粘贴抖音链接，解析后会出现在这里';
+  $('download-all').disabled = total === 0;
+  $('clear').disabled = total === 0;
+  const active = jobs.filter(job => activeStates.includes(job.status) && parsed.some(item => item.formats.some(format => format.id === job.mediaId))).length;
+  $('job-summary').textContent = active ? `${active} 个视频下载中` : '';
   $('media-list').replaceChildren(...visible.map(mediaRow));
   renderSelection();
 }
 
 async function start(ids) {
-  try {
-    const {jobIds} = await send({type: 'QUEUE_DOWNLOADS', ids, threads: Number($('threads').value), mode: $('download-mode').value});
-    toast(`已添加 ${jobIds.length} 个下载任务`);
-  } catch (error) { toast(error.message, true); }
+  const {jobIds} = await send({type: 'QUEUE_DOWNLOADS', ids, threads: Number($('threads').value), mode: $('download-mode').value});
+  toast(`已添加 ${jobIds.length} 个下载任务`);
 }
 
 /* ---------- Parse ---------- */
@@ -107,16 +106,19 @@ async function start(ids) {
 const parseJobs = new Map();
 const parseByRequest = new Map();
 let parseChain = Promise.resolve(), filtersReset = false;
-const linkLines = () => [...new Set($('video-url').value.split('\n').map(line => line.trim()).filter(line => /https?:\/\/\S+\.\S+/i.test(line)))];
+const allLinkLines = () => [...new Set($('video-url').value.split('\n').map(line => line.trim()).filter(line => /https?:\/\/\S+\.\S+/i.test(line)))];
+const linkLines = () => allLinkLines().filter(isDouyinLink);
 
 function finishParse(job, state) {
   job.state = state;
   if (state.status === 'ready') {
     const preferred = state.items.find(item => item.id === state.preferredId) || state.items[0];
-    chosenFormats.set(videoGroups([preferred])[0].key, preferred.id);
+    const key = videoGroups([preferred])[0].key;
+    chosenFormats.set(key, preferred.id);
+    parsedKeys.add(key); saveParsed();
     selected.add(preferred.id);
     job.onReady?.(preferred);
-    if (!filtersReset) { $('scope').value = 'all'; $('platform').value = 'all'; $('search').value = ''; filtersReset = true; }
+    if (!filtersReset) { $('search').value = ''; filtersReset = true; }
   }
   if (state.status !== 'loading') { parseByRequest.delete(job.requestId); job.done?.(); }
   renderParse();
@@ -173,7 +175,8 @@ function resultRow(job) {
 function renderParse() {
   const all = [...parseJobs.values()];
   const count = linkLines().length;
-  $('link-count').textContent = count ? `识别到 ${count} 个链接` : '粘贴后自动识别，每行一个链接';
+  const skipped = allLinkLines().length - count;
+  $('link-count').textContent = [count ? `识别到 ${count} 个抖音链接` : '粘贴后自动识别，每行一个抖音链接', skipped && `已忽略 ${skipped} 个非抖音链接`].filter(Boolean).join(' · ');
   $('parse-results').hidden = !all.length;
   const ready = all.filter(job => job.state.status === 'ready');
   const failed = all.filter(job => job.state.status === 'error').length;
@@ -202,194 +205,31 @@ $('results-clear').addEventListener('click', () => {
 });
 
 /* ---------- Toolbar ---------- */
-for (const name of supportedPlatforms) {
-  const option = element('wa-option', name); option.value = name;
-  $('platform').insertBefore(option, $('platform').querySelector('[value=other]'));
-}
-if (!sourceTabId) $('scope').querySelector('[value=current]').disabled = true;
 $('search').addEventListener('input', renderMedia);
 $('search').addEventListener('wa-clear', renderMedia);
-$('platform').addEventListener('change', renderMedia);
-$('scope').addEventListener('change', renderMedia);
 $('select-all').addEventListener('change', () => {
   for (const item of visibleItems()) { if ($('select-all').checked) selected.add(item.id); else selected.delete(item.id); }
   renderMedia();
 });
-$('batch-download').addEventListener('click', () => void start([...selected]));
+$('batch-download').addEventListener('click', () => void start([...selected]).then(() => { selected.clear(); renderMedia(); }, error => toast(error.message, true)));
 $('batch-clear').addEventListener('click', () => { selected.clear(); renderMedia(); });
-$('rescan').addEventListener('click', async () => {
-  $('rescan').disabled = true;
-  try {
-    const ids = $('scope').value === 'current' ? [sourceTabId] : [...new Set(items.map(item => item.sourceTabId).filter(id => id > 0))];
-    if (!ids.length) ids.push(...(await chrome.tabs.query({})).filter(tab => /^https?:/.test(tab.url || '')).map(tab => tab.id));
-    const results = await Promise.allSettled(ids.map(async tabId => {
-      await chrome.scripting.executeScript({target: {tabId, allFrames: true}, files: ['bridge.js']});
-      await chrome.scripting.executeScript({target: {tabId, allFrames: true}, world: 'MAIN', files: ['capture.js']});
-      await chrome.scripting.executeScript({target: {tabId, allFrames: true}, world: 'MAIN', func: () => window.__professionalVideoCapture?.scan(true)});
-    }));
-    const scanned = results.filter(result => result.status === 'fulfilled').length;
-    toast(scanned ? `已重新扫描 ${scanned} 个网页` : '来源网页已关闭，请重新打开作品页并播放视频', !scanned);
-  } catch (error) { toast(error.message, true); }
-  finally { $('rescan').disabled = false; }
-});
+$('download-all').addEventListener('click', () => void start(parsedItems().map(item => item.id)).catch(error => toast(error.message, true)));
 $('clear').addEventListener('click', async () => {
   try {
-    await send({type: 'CLEAR_LIBRARY'});
-    selected.clear(); await refresh();
-    toast('已清空视频记录，进行中的下载不受影响');
-  } catch (error) { toast(error.message, true); }
-});
-
-/* ---------- Downloads ---------- */
-function jobRow(job) {
-  const active = activeStates.includes(job.status);
-  const row = element('div', undefined, active ? 'job-row active' : 'job-row');
-  row.dataset.status = job.status;
-  const badge = element('div', undefined, 'job-icon');
-  badge.append(icon(job.status === 'complete' ? 'circle-check' : job.status === 'error' ? 'circle-alert' : job.status === 'canceled' ? 'x' : 'arrow-down-to-line'));
-
-  const body = element('div', undefined, 'job-body');
-  const title = element('div', job.title, 'job-title ellipsis'); title.title = job.title;
-  body.append(title);
-  const fraction = jobFraction(job);
-  if (active || job.status === 'error') {
-    const progress = element('wa-progress-bar', undefined, 'job-progress');
-    progress.label = `${job.title} 下载进度`;
-    progress.value = Math.min(100, fraction * 100);
-    progress.indeterminate = !fraction && ['fetching', 'merging'].includes(job.status);
-    body.append(progress);
-  }
-  const meta = element('div', undefined, 'job-meta');
-  meta.append(element('span', jobStates[job.status], 'state'));
-  if (active && fraction) meta.append(element('span', `${Math.round(fraction * 100)}%`));
-  if (job.received || job.size) meta.append(element('span', job.status === 'complete' ? sizeText(job.size || job.received) : `${sizeText(job.received)}${job.size ? ` / ${sizeText(job.size)}` : ''}`));
-  if (active && job.speed) meta.append(element('span', speedText(job.speed)));
-  const quality = qualityText({...job, id: job.mediaId});
-  if (quality) meta.append(element('span', quality));
-  body.append(meta);
-  if (job.status === 'error' && job.error) body.append(element('p', job.error, 'job-error'));
-  const notes = {running: '地址可能已失效，正在按来源网页重新解析…', done: '已按来源网页重新解析，新任务已加入列表', failed: `重新解析失败：${job.refreshError}`};
-  if (job.refresh) body.append(element('p', notes[job.refresh], job.refresh === 'failed' ? 'job-note failed' : 'job-note'));
-
-  const actions = element('div', undefined, 'job-actions');
-  if (active) {
-    const cancel = textButton('取消', undefined, 'btn sm outline');
-    cancel.onclick = () => void send({type: 'CANCEL_JOB', id: job.id}).catch(error => toast(error.message, true));
-    actions.append(cancel);
-  }
-  if (['error', 'canceled'].includes(job.status) && job.sourceUrl && !['running', 'done'].includes(job.refresh)) {
-    const retry = textButton('重新解析下载', 'refresh-cw', 'btn sm soft');
-    retry.onclick = () => void send({type: 'REFRESH_JOB', id: job.id}).catch(error => toast(error.message, true));
-    actions.append(retry);
-  }
-  row.append(badge, body, actions);
-  return row;
-}
-
-function renderJobs() {
-  const active = jobs.filter(job => activeStates.includes(job.status)).length;
-  $('active-count').textContent = String(active);
-  $('clear-jobs').hidden = !jobs.length;
-  $('complete-count').textContent = String(jobs.filter(job => job.status === 'complete').length);
-  $('failed-count').textContent = String(jobs.filter(job => ['error', 'canceled'].includes(job.status)).length);
-  if (!jobs.length) {
-    const empty = element('div', undefined, 'empty');
-    const art = element('div', undefined, 'empty-art'); art.append(icon('folder-down'));
-    const link = element('a', '去选择视频'); link.href = '#videos';
-    const hint = element('p'); hint.append('在视频列表点击下载后，任务会出现在这里。', link);
-    empty.append(art, element('h3', '暂无下载任务'), hint);
-    $('job-list').replaceChildren(empty);
-    return;
-  }
-  $('job-list').replaceChildren(...jobs.toSorted((a, b) => b.createdAt - a.createdAt).map(jobRow));
-}
-
-$('clear-jobs').addEventListener('click', async () => {
-  try {
-    const result = await send({type: 'CLEAR_JOBS'});
-    if (!result?.ok) throw new Error('插件后台还是旧版本，请在 chrome://extensions 重新加载大懒虫后再试');
-    await refresh();
-    toast(result.kept ? `已清空下载记录，保留 ${result.kept} 个进行中的下载` : '已清空下载记录');
+    parsedKeys.clear(); saveParsed();
+    selected.clear(); renderMedia();
+    toast('已清空解析列表，进行中的下载不受影响');
   } catch (error) { toast(error.message, true); }
 });
 
 /* ---------- Preview ---------- */
-let previewHls;
-const previewVideo = $('preview-video');
-const timeText = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
-let previewItem;
-const previewNotice = (text, refreshable = false) => { $('preview-notice').textContent = text; $('preview-problem').hidden = !text; $('preview-refresh').hidden = !refreshable; };
-const togglePlay = () => { if (previewVideo.paused) void playPreview(); else previewVideo.pause(); };
-function closePreviewMedia() {
-  previewVideo.pause();
-  if (previewHls) { previewHls.destroy(); previewHls = null; }
-  previewVideo.removeAttribute('src');
-  previewVideo.load();
-  $('preview-loading').hidden = true;
-  $('preview-seek').value = 0;
-  $('preview-seek').disabled = true;
-  $('preview-time').textContent = '0:00 / 0:00';
-}
-function playPreview() {
-  return previewVideo.play().catch(error => { if (error.name !== 'AbortError') previewNotice('暂时无法播放，可点击播放重试或打开来源网页。'); });
-}
-function openPreview(item) {
-  previewItem = item;
-  closePreviewMedia();
-  previewNotice(item.videoOnly ? '此画质只有画面，下载时会自动合并音轨。' : '');
-  $('preview-loading').hidden = false;
-  $('video-preview').label = item.title || '视频预览';
-  $('preview-source').href = item.sourceUrl;
-  $('video-preview').open = true;
-  if (item.kind === 'hls' && !previewVideo.canPlayType('application/vnd.apple.mpegurl')) {
-    previewHls = new Hls({enableWorker: false});
-    previewHls.on(Hls.Events.ERROR, (_, data) => {
-      if (data.fatal) { previewHls.stopLoad(); $('preview-loading').hidden = true; previewNotice('预览加载失败，视频地址可能已失效。', true); }
-    });
-    previewHls.loadSource(item.url);
-    previewHls.attachMedia(previewVideo);
-  } else previewVideo.src = item.url;
-  void playPreview();
-}
-$('preview-refresh').addEventListener('click', () => {
-  previewNotice('正在按来源网页重新解析…');
-  parseJobs.delete(previewItem.sourceUrl);
-  enqueueParse(previewItem.sourceUrl, fresh => { if ($('video-preview').open) openPreview(fresh); });
+// An expired address is resolved again from the work page, then the fresh record is previewed.
+const player = createPlayer({onRefresh(item, show) {
+  parseJobs.delete(item.sourceUrl);
+  enqueueParse(item.sourceUrl, show);
   renderParse();
-});
-$('video-preview').addEventListener('wa-after-hide', event => { if (event.target === $('video-preview')) closePreviewMedia(); });
-$('preview-play').addEventListener('click', togglePlay);
-previewVideo.addEventListener('click', togglePlay);
-for (const type of ['play', 'pause', 'ended']) previewVideo.addEventListener(type, () => {
-  const label = previewVideo.paused ? '播放' : '暂停';
-  $('preview-play').title = label; $('preview-play').setAttribute('aria-label', label);
-  $('preview-play').querySelector('wa-icon').name = previewVideo.paused ? 'play' : 'pause';
-});
-for (const type of ['timeupdate', 'loadedmetadata', 'durationchange']) previewVideo.addEventListener(type, () => {
-  const duration = Number.isFinite(previewVideo.duration) ? previewVideo.duration : 0;
-  $('preview-time').textContent = `${timeText(previewVideo.currentTime)} / ${timeText(duration)}`;
-  $('preview-seek').disabled = !duration;
-  $('preview-seek').max = duration || 100;
-  $('preview-seek').value = previewVideo.currentTime;
-});
-$('preview-seek').addEventListener('input', () => { previewVideo.currentTime = $('preview-seek').value; });
-$('preview-mute').addEventListener('click', () => {
-  previewVideo.muted = !previewVideo.muted;
-  const label = previewVideo.muted ? '取消静音' : '静音';
-  $('preview-mute').title = label; $('preview-mute').setAttribute('aria-label', label);
-  $('preview-mute').querySelector('wa-icon').name = previewVideo.muted ? 'volume-x' : 'volume-2';
-});
-previewVideo.addEventListener('loadeddata', () => {
-  $('preview-loading').hidden = true;
-  if (!previewVideo.videoWidth) previewNotice('暂未读取到视频画面，请选择其他画质或打开来源网页。');
-});
-previewVideo.addEventListener('playing', () => { $('preview-loading').hidden = true; });
-previewVideo.addEventListener('waiting', () => { if ($('video-preview').open) $('preview-loading').hidden = false; });
-previewVideo.addEventListener('error', () => {
-  $('preview-loading').hidden = true;
-  if (previewVideo.error?.code === 3) previewNotice('浏览器无法解码此画质，请选择其他画质或直接下载。');
-  else previewNotice('预览加载失败，视频地址可能已失效。', true);
-});
+}});
+const openPreview = item => player.open(item);
 
 /* ---------- Settings ---------- */
 const modeHints = {auto: '普通视频由 Chrome 直接下载；HLS、分轨视频自动使用扩展下载器。', parallel: '所有视频都由扩展分段并行下载，再保存为文件。'};
@@ -405,7 +245,7 @@ $('download-mode').addEventListener('change', () => {
 $('help').addEventListener('click', () => { $('help-dialog').open = true; });
 
 /* ---------- Routing & data ---------- */
-const pageTitles = {videos: '视频', downloads: '下载', settings: '设置'};
+const pageTitles = {videos: '批量下载', settings: '设置'};
 function renderPage() {
   const page = location.hash.slice(1) in pageTitles ? location.hash.slice(1) : 'videos';
   for (const name of Object.keys(pageTitles)) $(`${name}-view`).hidden = name !== page;
@@ -423,7 +263,7 @@ async function refresh() {
   items = data.items.sort((a, b) => b.createdAt - a.createdAt);
   jobs = data.jobs;
   for (const id of selected) if (!items.some(item => item.id === id)) selected.delete(id);
-  renderMedia(); renderJobs();
+  renderMedia();
 }
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'session') return;
@@ -441,7 +281,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       if (!change.newValue) { if (index >= 0) jobs.splice(index, 1); }
       else if (index < 0) jobs.push(change.newValue); else jobs[index] = change.newValue;
     }
-    renderJobs();
+    renderMedia();
   }
 });
 await loadResolutions();

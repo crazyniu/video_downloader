@@ -1,5 +1,5 @@
 import {platformName, normalizeMediaURL, mediaType, fileName, probeMediaFile} from './media.js';
-import {canCaptureSource, mediaIdentity, mediaSize, uniqueMedia} from './media-records.js';
+import {canCaptureSource, mediaIdentity, mediaSize, uniqueMedia, videoGroups} from './media-records.js';
 import {isMediaURL} from './platforms.js';
 
 let writes = Promise.resolve();
@@ -248,3 +248,20 @@ async function finishDownload(downloadId) {
 chrome.downloads.onChanged.addListener(delta => {
   if (delta.state && ['complete', 'interrupted'].includes(delta.state.current)) void finishDownload(delta.id).catch(console.error);
 });
+
+// The toolbar badge shows how many videos have been captured so far (one per work, audio tracks excluded).
+let badgeTimer;
+async function updateBadge() {
+  const stored = await chrome.storage.session.get(null);
+  const records = Object.entries(stored).filter(([key, item]) => key.startsWith('media:') && item.kind !== 'audio' && canCaptureSource(item.sourceUrl || '')).map(([, item]) => item);
+  const count = videoGroups(uniqueMedia(records)).length;
+  await chrome.action.setBadgeText({text: count ? (count > 999 ? '999+' : String(count)) : ''});
+}
+chrome.action.setBadgeBackgroundColor({color: '#46682f'});
+chrome.action.setBadgeTextColor?.({color: '#ffffff'});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'session' || !Object.keys(changes).some(key => key.startsWith('media:'))) return;
+  clearTimeout(badgeTimer);
+  badgeTimer = setTimeout(() => void updateBadge().catch(console.error), 300);
+});
+void updateBadge().catch(console.error);
