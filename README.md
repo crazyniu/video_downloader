@@ -36,6 +36,24 @@
 
 要求 Chrome 116 或更高版本。
 
+## 打包 CRX
+
+GitHub Actions 的「Pack CRX」工作流会把 `extension/` 打包成签名的 `.crx` 和同内容的 `.zip`：
+
+- 推送到 `main`（改动了扩展）或在 Actions 页手动运行：在该次运行的 Artifacts 里下载
+- 推送 `v1.5.1` 这样的标签（须与 `manifest.json` 的版本一致）：同时发布到 Releases
+
+签名私钥放在仓库 Secret `CRX_PRIVATE_KEY`，扩展 ID 由它决定，请固定使用同一把并妥善备份。没有设置时每次构建用临时私钥，ID 会变。生成私钥：
+
+```sh
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out dalanchong.pem
+gh secret set CRX_PRIVATE_KEY < dalanchong.pem
+```
+
+本地打包：`scripts/pack.sh dalanchong.pem`，输出到 `dist/`（需要本机 Chrome，可用 `CHROME=/path/to/chrome` 指定）。
+
+Windows / macOS 版 Chrome 只允许安装 Chrome 应用商店的 CRX，自行打包的 CRX 需要通过企业策略（`ExtensionInstallForcelist`）分发；个人使用请解压 `.zip` 后按上面的步骤「加载已解压的扩展程序」。
+
 ## 使用
 
 1. 打开视频网页并播放，点击工具栏的大懒虫图标即可看到监听到的视频；在抖音 / 快手作品页打开时会自动解析当前作品
@@ -79,6 +97,8 @@ extension/
 ├── page.js / kuaishou.js  平台详情解析
 ├── vendor/           本地打包的 Web Awesome、Lucide、hls.js、FFmpeg WASM
 └── licenses/         第三方许可
+scripts/pack.sh       打包 CRX 与 ZIP
+.github/workflows/    打包工作流
 ```
 
 ## 参与贡献

@@ -1,0 +1,78 @@
+# Packs the extension into a signed .crx and a .zip.
+# - Every push to main that touches the extension, and manual runs: files are attached to the run as an artifact.
+# - Pushing a tag like v1.5.1 (must match manifest.json): files are also published as a GitHub Release.
+# The signing key comes from the CRX_PRIVATE_KEY secret so the extension ID stays the same across builds.
+name: Pack CRX
+
+on:
+  push:
+    branches: [main]
+    paths: ['extension/**', 'scripts/pack.sh', '.github/workflows/pack.yml']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write signing key
+        env:
+          CRX_PRIVATE_KEY: ${{ secrets.CRX_PRIVATE_KEY }}
+        run: |
+          if [ -n "$CRX_PRIVATE_KEY" ]; then
+            printf '%s\n' "$CRX_PRIVATE_KEY" > "$RUNNER_TEMP/key.pem"
+            echo "KEY_FILE=$RUNNER_TEMP/key.pem" >> "$GITHUB_ENV"
+          else
+            echo "::warning::CRX_PRIVATE_KEY secret is not set; this build uses a throwaway key and gets a different extension ID."
+          fi
+
+      - name: Pack
+        id: pack
+        run: scripts/pack.sh ${KEY_FILE:+"$KEY_FILE"} | tee -a "$GITHUB_OUTPUT"
+
+      - name: Check tag matches manifest version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [ "${GITHUB_REF_NAME#v}" != "${{ steps.pack.outputs.version }}" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match manifest.json version ${{ steps.pack.outputs.version }}"
+            exit 1
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "### 大懒虫 ${{ steps.pack.outputs.version }}"
+            echo "- Extension ID: \`${{ steps.pack.outputs.id }}\`"
+            echo "- \`${{ steps.pack.outputs.crx }}\`, \`${{ steps.pack.outputs.zip }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dalanchong-${{ steps.pack.outputs.version }}
+          path: |
+            ${{ steps.pack.outputs.crx }}
+            ${{ steps.pack.outputs.zip }}
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "大懒虫 ${GITHUB_REF_NAME#v}" --generate-notes

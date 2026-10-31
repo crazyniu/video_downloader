@@ -16,6 +16,8 @@
 
 检查语法：`for f in extension/*.js; do node --check "$f"; done`
 
+打包：`scripts/pack.sh [key.pem]` 用 Chrome 的 `--pack-extension` 生成 `dist/` 下的 `.crx` 与 `.zip`；`.github/workflows/pack.yml` 在推送 `main` 和 `v*` 标签时运行，签名私钥取自 Secret `CRX_PRIVATE_KEY`。私钥不要提交（`.gitignore` 已忽略 `*.pem`）。
+
 ## 结构
 
 | 文件 | 作用 |
