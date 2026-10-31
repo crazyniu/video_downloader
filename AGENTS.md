@@ -25,7 +25,9 @@
 1. 从上一个 `v*` 标签起看 `git log`，按改动定版本号（`manifest.json` 的 `version`）：只修问题加修订号（1.5.1 → 1.5.2），新增或改变功能加次版本号（1.5.1 → 1.6.0），主版本号只在用户要求时改
 2. 只改 `extension/manifest.json` 的 `version`，提交 `Release v<版本>`
 3. 打同名标签并推送：`git push origin main && git tag v<版本> && git push origin v<版本>`；工作流会检查标签与 manifest 一致，打包并发布到 Releases
-4. 用 `gh run watch` 等工作流结束，确认 Release 里有 `.crx` 和 `.zip`、运行摘要里的扩展 ID 没变，再把 Release 链接告诉用户
+4. 用 `gh run watch` 等工作流结束，确认 Release 里有 `.crx` 和 `.zip`、运行摘要里的扩展 ID 没变
+5. 写中文更新说明替换自动生成的说明：`gh release edit v<版本> --notes-file <文件>`。按上一个标签以来的提交整理，面向用户写「新功能 / 改进 / 修复 / 移除」分组（没有的组省略），每条一句话说清用户能感知的变化，不写内部重构和提交哈希；最后附「安装」说明（解压 zip 后加载已解压的扩展程序）和完整对比链接
+6. 把 Release 链接告诉用户
 
 不要重复使用或移动已推送的标签；发错了就发下一个修订号。
 
