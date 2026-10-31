@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "大懒虫",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "抖音、快手及网页视频解析与下载，支持批量解析、多线程下载与 HLS。",
   "minimum_chrome_version": "116",
   "permissions": [
